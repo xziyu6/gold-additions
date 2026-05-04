@@ -400,7 +400,7 @@ class ImportantDate extends CalendarEvent {
     const dtEnd = CalendarEvent.dateToIcs(endDatetime);
 
     return {
-      summary: this.name,
+      summary: `${CalendarEvent.QUARTER_NAME} - ${this.name}`,
       dtStart: this.isTimed ? dtStart : dtStart.slice(0, 8),
       dtEnd: this.isTimed ? dtEnd : dtEnd.slice(0, 8),
     };

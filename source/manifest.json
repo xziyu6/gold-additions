@@ -29,9 +29,9 @@
       ],
       "js": [
         "scripts/utils.js",
-        "scripts/export-schedule.js",
+        "scripts/event-classes.js",
         "scripts/instructor-link.js",
-        "scripts/event-classes.js"
+        "scripts/export-schedule.js"
       ]
     },
     {

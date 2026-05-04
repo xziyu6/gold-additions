@@ -20,6 +20,8 @@ class CalendarEvent {
     January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
     July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
   };
+  static QUARTER_ID = null;
+  static QUARTER_NAME = null;
 
   /**
    * @param {string} time HH:MM AM/PM
@@ -111,11 +113,12 @@ class CalendarEvent {
   }
 
   /**
-   * Generate a simple unique ID for a calendar object.
+   * @param {string} type
+   * @param {string} info
    * @returns {string}
    */
-  static generateUid() {
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}@gold-additions`;
+  generateUid(type, info) {
+    return `${CalendarEvent.QUARTER_ID}-${type}-${info}@gold-additions`;
   }
 
   /**
@@ -136,11 +139,9 @@ class CalendarEvent {
 
   /**
    * Build the event-specific lines for the ICS event.
-   * @param {EventIcsData} data - The event data
    * @returns {string[]} Array of ICS property lines
    */
-  // eslint-disable-next-line no-unused-vars
-  buildEventLines(data) {
+  buildEventLines() {
     throw new Error('buildEventLines must be implemented by subclass');
   }
 
@@ -149,15 +150,11 @@ class CalendarEvent {
    * @returns {string}
    */
   toIcsEvent() {
-    const data = this.parseEventIcsData();
-    const uid = CalendarEvent.generateUid();
-    const dtStamp = CalendarEvent.generateDtStamp();
-
     return [
       'BEGIN:VEVENT',
-      `UID:${uid}`,
-      `DTSTAMP:${dtStamp}`,
-      ...this.buildEventLines(data),
+      `UID:${this.generateUid()}`,
+      `DTSTAMP:${CalendarEvent.generateDtStamp()}`,
+      ...this.buildEventLines(),
       'END:VEVENT'
     ].join('\n');
   }
@@ -226,6 +223,7 @@ class CourseClass extends CalendarEvent {
     this.courseID = courseID;
     this.grading = grading;
     this.units = units;
+    this.data = this.parseEventIcsData();
   }
 
   /** @returns {EventIcsData} */
@@ -254,19 +252,26 @@ class CourseClass extends CalendarEvent {
   }
 
   /**
-   * @param {EventIcsData} data
+   * @param {EventIcsData} this.data
    * @returns {string[]}
    */
-  buildEventLines(data) {
+  buildEventLines() {
     return [
-      CalendarEvent.formatSummary(data.summary),
-      CalendarEvent.formatDateTime('DTSTART', data.dtStart),
-      CalendarEvent.formatDateTime('DTEND', data.dtEnd),
-      `RRULE:FREQ=WEEKLY;BYDAY=${data.days};UNTIL=${data.untilDate}`,
-      CalendarEvent.formatLocation(data.location),
+      CalendarEvent.formatSummary(this.data.summary),
+      CalendarEvent.formatDateTime('DTSTART', this.data.dtStart),
+      CalendarEvent.formatDateTime('DTEND', this.data.dtEnd),
+      `RRULE:FREQ=WEEKLY;BYDAY=${this.data.days};UNTIL=${this.data.untilDate}`,
+      CalendarEvent.formatLocation(this.data.location),
     ].concat(
-      data.description ? [CalendarEvent.formatDescription(data.description)] : []
+      this.data.description ? [CalendarEvent.formatDescription(this.data.description)] : []
     );
+  }
+  
+  /** @returns {string} */
+  generateUid() {
+    const shortName = this.name.split('-')[0].trim().split(' ').join('');
+    const startTime = this.data.dtStart.slice(9, 13); // HHMM
+    return super.generateUid("CourseClass", `${shortName}-${this.day}${startTime}`);
   }
 }
 
@@ -283,6 +288,7 @@ class FinalExam extends CalendarEvent {
     super();
     this.name = name;
     this.datetime = datetime;
+    this.data = this.parseEventIcsData();
   }
 
   /** @returns {EventIcsData} */
@@ -321,12 +327,18 @@ class FinalExam extends CalendarEvent {
    * @param {EventIcsData} data
    * @returns {string[]}
    */
-  buildEventLines(data) {
+  buildEventLines() {
     return [
-      CalendarEvent.formatSummary(data.summary),
-      CalendarEvent.formatDateTime('DTSTART', data.dtStart),
-      CalendarEvent.formatDateTime('DTEND', data.dtEnd),
+      CalendarEvent.formatSummary(this.data.summary),
+      CalendarEvent.formatDateTime('DTSTART', this.data.dtStart),
+      CalendarEvent.formatDateTime('DTEND', this.data.dtEnd),
     ];
+  }
+
+  /** @returns {string} */
+  generateUid() {
+    const shortName = this.name.split('-')[0].trim().split(' ').join('');
+    return super.generateUid("FinalExam", shortName);
   }
 }
 
@@ -339,14 +351,17 @@ class ImportantDate extends CalendarEvent {
   static DATETIME_REGEX = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}(?:\s+\d{1,2}:\d{2}\s*(?:AM|PM))?$/;
 
   /**
-   * @param {string} name       Name of the important date (e.g., "Add Deadline", "Registration Pass 1 Opens")
-   * @param {string} datetime   Raw date string from GOLD page (MM/DD/YYYY or MM/DD/YYYY HH:MM AM/PM)
+   * @param {string} name       e.g.: "Add Deadline", "Registration Pass 1 Opens"
+   * @param {string} id         e.g.: "addDeadline", "pass1Start"
+   * @param {string} datetime   MM/DD/YYYY or MM/DD/YYYY HH:MM AM/PM
    */
-  constructor(name, datetime) {
+  constructor(name, id, datetime) {
     super();
     this.name = name;
+    this.id = id;
     this.datetime = datetime;
     this.isTimed = datetime.trim().split(' ').length === 3;
+    this.data = this.parseEventIcsData();
   }
 
   /**
@@ -385,7 +400,7 @@ class ImportantDate extends CalendarEvent {
     const dtEnd = CalendarEvent.dateToIcs(endDatetime);
 
     return {
-      summary: this.name,
+      summary: `${CalendarEvent.QUARTER_NAME} - ${this.name}`,
       dtStart: this.isTimed ? dtStart : dtStart.slice(0, 8),
       dtEnd: this.isTimed ? dtEnd : dtEnd.slice(0, 8),
     };
@@ -395,19 +410,24 @@ class ImportantDate extends CalendarEvent {
    * @param {EventIcsData} data
    * @returns {string[]}
    */
-  buildEventLines(data) {
+  buildEventLines() {
     return [
-      CalendarEvent.formatSummary(data.summary),
+      CalendarEvent.formatSummary(this.data.summary),
       ...(this.isTimed
         ? [
-          CalendarEvent.formatDateTime('DTSTART', data.dtStart),
-          CalendarEvent.formatDateTime('DTEND', data.dtEnd),
+          CalendarEvent.formatDateTime('DTSTART', this.data.dtStart),
+          CalendarEvent.formatDateTime('DTEND', this.data.dtEnd),
         ]
         : [
-          CalendarEvent.formatDate('DTSTART', data.dtStart),
-          CalendarEvent.formatDate('DTEND', data.dtEnd),
+          CalendarEvent.formatDate('DTSTART', this.data.dtStart),
+          CalendarEvent.formatDate('DTEND', this.data.dtEnd),
         ]
       ),
     ];
+  }
+  
+  /** @returns {string} */
+  generateUid() {
+    return super.generateUid("ImportantDate", this.id);
   }
 }

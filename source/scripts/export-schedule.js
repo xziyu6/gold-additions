@@ -41,8 +41,8 @@ const settings = {
   const scheduleContainer = document.querySelector('#div_Schedule_Container');
 
   const currentQuarterOption = document.querySelector('#ctl00_pageContent_quarterDropDown option[selected="selected"]');
-  const PAGE_QUARTER_ID = currentQuarterOption?.getAttribute('value')?.trim() || '';
-  const PAGE_QUARTER_NAME = currentQuarterOption?.textContent?.trim() || '';
+  CalendarEvent.QUARTER_ID = currentQuarterOption?.getAttribute('value')?.trim() || '';
+  CalendarEvent.QUARTER_NAME = currentQuarterOption?.textContent?.trim() || '';
   let QUARTERS_CACHE = {};
 
   // ===== Export Button Setup =====
@@ -248,11 +248,11 @@ const settings = {
 
   /** @param {CalendarEvent[]} events */
   function getImportantDates(events) {
-    const quarterInfo = QUARTERS_CACHE[PAGE_QUARTER_ID];
+    const quarterInfo = QUARTERS_CACHE[CalendarEvent.QUARTER_ID];
     Object.entries(quarterInfo).forEach(([key, value]) => {
       if (key === 'name') return;
       if (QUARTER_DATE_FIELDS[key]) {
-        events.push(new ImportantDate(QUARTER_DATE_FIELDS[key].name, value));
+        events.push(new ImportantDate(QUARTER_DATE_FIELDS[key].name, key, value));
       } else {
         console.warn(`Unknown quarter date field: ${key}`);
       }
@@ -264,10 +264,10 @@ const settings = {
   /** Read quarter data from storage and update the UI accordingly. */
   function refreshQuarterUI() {
     const quarterLabel = document.getElementById('ics-quarter-label');
-    quarterLabel.textContent = PAGE_QUARTER_NAME;
+    quarterLabel.textContent = CalendarEvent.QUARTER_NAME;
     chrome.storage.local.get(['quarters'], (result) => {
       QUARTERS_CACHE = result.quarters || {};
-      const q = QUARTERS_CACHE[PAGE_QUARTER_ID];
+      const q = QUARTERS_CACHE[CalendarEvent.QUARTER_ID];
 
       // Update warning visibility
       const quarterWarning = document.getElementById('ics-quarter-warning');
